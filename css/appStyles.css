@@ -1,0 +1,77 @@
+/* ==========================================================================
+   EncoreTrail - appStyles.css
+   Tailwind（CDN/JIT）で表現しづらい部分のみを補うカスタムCSS。
+   レイアウト・色・余白は原則Tailwindユーティリティ側で指定する。
+   ========================================================================== */
+
+:root {
+  --et-base: #eef1f6;        /* ニューモーフィズムの基準サーフェス色 */
+  --et-shadow-light: #ffffff;
+  --et-shadow-dark: #c7cdda;
+  --et-accent: #ff9f40;       /* スポットライトを想起させるアクセント */
+  --et-accent-dark: #e8862b;
+  --et-ink: #2b2e36;
+  --et-ink-muted: #7b818f;
+  --et-danger: #e0625f;
+  --et-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body {
+  background: var(--et-base);
+  color: var(--et-ink);
+  font-family: "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ---- ニューモーフィズム: 浮き出し（カード・ボタンなど） ---- */
+.neu-raised {
+  background: var(--et-base);
+  box-shadow:
+    8px 8px 16px var(--et-shadow-dark),
+    -8px -8px 16px var(--et-shadow-light);
+}
+
+/* ---- ニューモーフィズム: 押し込み（ダイヤル・選択中タブなど） ---- */
+.neu-pressed {
+  background: var(--et-base);
+  box-shadow:
+    inset 6px 6px 12px var(--et-shadow-dark),
+    inset -6px -6px 12px var(--et-shadow-light);
+}
+
+/* 古い端末でも滑らかすぎる影の再計算負荷を抑えるための簡易版（任意） */
+@media (prefers-reduced-motion: no-preference) {
+  .neu-raised,
+  .neu-pressed,
+  .et-card {
+    transition: box-shadow 0.15s ease, transform 0.1s ease;
+  }
+}
+
+/* ---- 一覧カード（意図的にフラット。可読性を優先しニューモーフィズムは適用しない） ---- */
+.et-card {
+  background: #ffffff;
+  border: 1px solid #e4e8ef;
+}
+.et-card:active {
+  border-color: var(--et-accent);
+}
+
+/* ---- フォーカスリング（アクセシビリティの最低保証） ---- */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--et-accent);
+  outline-offset: 2px;
+}
+
+/* ---- フォーム部品（Tailwindの素のinputに最低限の質感を追加） ---- */
+.et-input {
+  background: #ffffff;
+  border: 1px solid #dde1e8;
+  border-radius: 0.75rem;
+}
+.et-input:focus {
+  border-color: var(--et-accent);
+}

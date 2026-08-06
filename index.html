@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://cdn.tailwindcss.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com;
+  img-src 'self' data:;
+  connect-src 'self' https://www.wikidata.org https://accounts.google.com https://oauth2.googleapis.com https://gmail.googleapis.com https://musicbrainz.org;
+  manifest-src 'self';
+  base-uri 'self';
+  form-action 'self';
+" />
+<title>EncoreTrail</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+  href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;600;800&display=swap"
+  rel="stylesheet"
+/>
+<link rel="stylesheet" href="css/appStyles.css" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon192.png" />
+<meta name="theme-color" content="#EEF1F6" />
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen">
+  <div class="max-w-md mx-auto px-4 pb-24" style="padding-bottom: calc(6rem + var(--et-safe-bottom));">
+
+    <!-- ホーム画面（Phase 8b ダッシュボード） -->
+    <main data-view="home" class="pt-4">
+      <!-- ⚙ 外観設定ボタン（右上） -->
+      <div class="flex justify-end mb-1">
+        <button id="appearanceSettingsBtn" aria-label="外観設定"
+          class="w-8 h-8 flex items-center justify-center rounded-full text-[var(--et-ink-muted)] hover:text-[var(--et-accent)]">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 1段目: 今日の日付 -->
+      <div id="todaySlot"></div>
+
+      <!-- 2段目: ヒーロー（次のライブまでのカウントダウン） -->
+      <div id="heroSlot"></div>
+
+      <!-- 記念日・推し記念日の通知バナー（Phase 8d） -->
+      <div id="anniversaryBanner"></div>
+
+      <!-- 3段目: 最新情報（Gmail 等の自動取得イベントがある場合のみ表示） -->
+      <div id="latestInfoSlot"></div>
+
+      <!-- 4段目: 今後の予定（14日以内 CalendarEvent + 抽選締切・当落発表 統合タイムライン） -->
+      <div id="upcomingEventsSlot" class="mt-2"></div>
+
+      <!-- クイックアクション -->
+      <div class="mt-4 border-t border-[#f0f2f7] pt-3">
+        <div class="flex gap-2">
+          <button id="qaAddLive" class="flex-1 py-2 text-xs font-semibold text-center" style="color:var(--et-accent);">ライブ記録を追加</button>
+          <button id="qaAddLottery" class="flex-1 py-2 text-xs font-semibold text-center" style="color:var(--et-accent);">抽選を追加</button>
+          <button id="qaAddOshi" class="flex-1 py-2 text-xs font-semibold text-center" style="color:var(--et-accent);">推しを追加</button>
+        </div>
+      </div>
+
+      <!-- 抽選管理（追加・編集・削除） -->
+      <div id="lotteryContent" class="mt-4"></div>
+    </main>
+
+    <!-- 記録一覧画面 -->
+    <main data-view="records" class="hidden pt-5">
+      <details id="recordListSection" open>
+        <summary class="flex items-center gap-1 cursor-pointer select-none list-none text-xs text-[var(--et-ink-muted)] mb-3">
+          <span>ライブ記録</span>
+          <span id="recordListCount" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#f0f2f7] text-[var(--et-ink-muted)] ml-0.5"></span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div id="listContent"></div>
+      </details>
+
+      <!-- 楽曲セクション（折りたたみ式） -->
+      <details id="setlistSection" class="pt-4 border-t border-[#e4e8ef]">
+        <summary class="flex items-center gap-1 cursor-pointer select-none list-none text-xs text-[var(--et-ink-muted)] mb-3">
+          <span>楽曲</span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div id="setlistContent"></div>
+      </details>
+
+      <!-- 統計セクション（折りたたみ式） -->
+      <details id="statsSection" class="pt-4 border-t border-[#e4e8ef]">
+        <summary class="flex items-center gap-1 cursor-pointer select-none list-none text-xs text-[var(--et-ink-muted)] mb-3">
+          <span>参戦統計</span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div id="statsContent"></div>
+      </details>
+
+      <div class="pt-4 border-t border-[#e4e8ef]">
+        <p class="text-xs text-[var(--et-ink-muted)] mb-2">データの管理</p>
+        <div class="flex gap-2">
+          <button id="exportButton" class="flex-1 py-2.5 rounded-xl border border-[#dde1e8] text-sm font-semibold">
+            バックアップする
+          </button>
+          <button id="importButton" class="flex-1 py-2.5 rounded-xl border border-[#dde1e8] text-sm font-semibold">
+            バックアップから復元
+          </button>
+        </div>
+        <input type="file" id="importFileInput" accept="application/json" class="hidden" />
+      </div>
+    </main>
+
+    <!-- ライブ追加・編集画面 -->
+    <main data-view="add" class="hidden pt-5">
+      <p id="formTitle" class="font-bold text-base mb-4">ライブを追加</p>
+      <form id="recordForm" class="space-y-4">
+        <input type="hidden" name="editingId" />
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">アーティスト</span>
+          <input required name="artist" type="text" placeholder="例：◯◯◯"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <div class="flex gap-2">
+          <label class="flex-1 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">公演日</span>
+            <input required name="date" type="date"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+          <label class="w-28 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">開演時刻（任意）</span>
+            <input name="time" type="time"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">終演日（任意・複数日の場合）</span>
+          <input name="endDate" type="date"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          <p class="text-[10px] text-[var(--et-ink-muted)] mt-1">入力するとカレンダーに期間バーが表示されます</p>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">会場</span>
+          <input name="venue" type="text" placeholder="例：横浜アリーナ"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">ツアー / イベント名</span>
+          <input name="tour" type="text" placeholder="任意"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">座席</span>
+          <input name="seat" type="text" placeholder="任意"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <div class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">セトリ</span>
+          <!-- 追加済み楽曲チップ表示エリア -->
+          <div id="setlistChips"
+               class="mt-1.5 min-h-[2.5rem] p-2 et-input flex flex-wrap gap-1.5 items-start"></div>
+          <!-- 楽曲検索入力 -->
+          <div class="relative mt-1.5">
+            <input id="setlistSearchInput" type="text" autocomplete="off"
+                   placeholder="曲名を入力してEnterで追加…"
+                   class="et-input w-full px-3 py-2.5 text-[15px]" />
+            <div id="setlistSuggestions" class="relative"></div>
+          </div>
+          <p class="text-[10px] text-[var(--et-ink-muted)] mt-1">
+            アーティスト名を入力してから曲名を入力すると候補が表示されます（インターネット接続時のみ）
+          </p>
+        </div>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">メモ</span>
+          <textarea name="memo" placeholder="任意" rows="3"
+                    class="et-input w-full mt-1 px-3 py-2.5 text-[15px]"></textarea>
+        </label>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="cancelEditButton" class="flex-1 py-3 rounded-xl border border-[#dde1e8] font-bold text-[var(--et-ink-muted)]">
+            戻る
+          </button>
+          <button type="submit" id="submitButton" class="flex-1 py-3 rounded-xl font-bold text-white" style="background:var(--et-accent-dark);">
+            追加する
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <!-- 抽選追加・編集画面 -->
+    <main data-view="lottery-add" class="hidden pt-5">
+      <p id="lotteryFormTitle" class="font-bold text-base mb-4">抽選を追加</p>
+      <form id="lotteryForm" class="space-y-4">
+        <input type="hidden" name="editingId" />
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">タイトル</span>
+          <input required name="title" type="text" placeholder="例：SUMMER TOUR 横浜アリーナ 1次先行"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">アーティスト</span>
+          <input required name="artist" type="text" placeholder="例：◯◯◯"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <div class="flex gap-2">
+          <label class="flex-1 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">申込締切日</span>
+            <input required name="applicationDeadline" type="date"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+          <label class="w-28 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">締切時刻（任意）</span>
+            <input name="deadlineTime" type="time"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+        </div>
+
+        <div class="flex gap-2">
+          <label class="flex-1 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">当落発表日</span>
+            <input required name="announcementDate" type="date"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+          <label class="w-28 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">発表時刻（任意）</span>
+            <input name="announcementTime" type="time"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+        </div>
+
+        <div class="flex gap-2">
+          <label class="flex-1 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">公演予定日（任意）</span>
+            <input name="liveDate" type="date"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+          <label class="w-28 block">
+            <span class="text-xs text-[var(--et-ink-muted)]">公演時刻（任意）</span>
+            <input name="liveTime" type="time"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">ステータス</span>
+          <select name="status" class="et-input w-full mt-1 px-3 py-2.5 text-[15px]">
+            <option value="pending">申込中</option>
+            <option value="won">当選</option>
+            <option value="lost">落選</option>
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">メモ</span>
+          <textarea name="memo" placeholder="任意" rows="2"
+                    class="et-input w-full mt-1 px-3 py-2.5 text-[15px]"></textarea>
+        </label>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="lotteryCancelEditButton" class="flex-1 py-3 rounded-xl border border-[#dde1e8] font-bold text-[var(--et-ink-muted)]">
+            戻る
+          </button>
+          <button type="submit" id="lotterySubmitButton" class="flex-1 py-3 rounded-xl font-bold text-white" style="background:var(--et-accent-dark);">
+            追加する
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <!-- 推し一覧画面 -->
+    <main data-view="oshi" class="hidden pt-5">
+      <!-- 推しセクション（折りたたみ式） -->
+      <details id="oshiSection" open>
+        <summary class="flex items-center gap-1 cursor-pointer select-none list-none text-xs text-[var(--et-ink-muted)] mb-3">
+          <span>推し</span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div id="oshiContent"></div>
+      </details>
+
+      <!-- ファンクラブセクション（折りたたみ式） -->
+      <details id="fanClubSection" open class="mt-6 pt-4 border-t border-[#e4e8ef]">
+        <summary class="flex items-center gap-1 cursor-pointer select-none list-none text-xs text-[var(--et-ink-muted)] mb-3">
+          <span>ファンクラブ</span>
+          <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div id="fanClubContent"></div>
+      </details>
+    </main>
+
+    <!-- 推し追加・編集画面 -->
+    <main data-view="oshi-add" class="hidden pt-5">
+      <p id="oshiFormTitle" class="font-bold text-base mb-4">推しを追加</p>
+      <form id="oshiForm" class="space-y-4">
+        <input type="hidden" name="editingId" />
+        <input type="hidden" name="externalId" />
+
+        <div class="block">
+          <label class="block">
+            <span class="text-xs text-[var(--et-ink-muted)]">推しの名前</span>
+            <input required name="name" type="text" placeholder="例：◯◯◯"
+                   autocomplete="off"
+                   class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          </label>
+          <!-- Wikidata 検索サジェストリスト（動的に挿入） -->
+          <div id="oshiSuggestions" class="relative"></div>
+          <p class="text-[10px] text-[var(--et-ink-muted)] mt-1">
+            入力すると候補が表示されます（インターネット接続時のみ）
+          </p>
+        </div>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">種別</span>
+          <select name="type" class="et-input w-full mt-1 px-3 py-2.5 text-[15px]">
+            <option value="individual">個人</option>
+            <option value="group">グループ</option>
+          </select>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">誕生日（任意）</span>
+          <input name="birthday" type="date"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">推し始めた日（任意）</span>
+          <input name="anniversaryDate" type="date"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">メルマガの送信元アドレス（任意）</span>
+          <input name="newsletterSenderAddress" type="email" placeholder="例：news@example.com"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          <p class="text-[10px] text-[var(--et-ink-muted)] mt-1">
+            公式メルマガから自動取得する際に使います
+          </p>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">公式サイトURL（任意）</span>
+          <input name="officialSiteUrl" type="url" placeholder="例：https://example.com/news"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+          <p class="text-[10px] text-[var(--et-ink-muted)] mt-1">
+            保存すると推し一覧に「公式サイトを開く」リンクが表示されます
+          </p>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">メモ</span>
+          <textarea name="memo" placeholder="任意" rows="2"
+                    class="et-input w-full mt-1 px-3 py-2.5 text-[15px]"></textarea>
+        </label>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="oshiCancelEditButton" class="flex-1 py-3 rounded-xl border border-[#dde1e8] font-bold text-[var(--et-ink-muted)]">
+            戻る
+          </button>
+          <button type="submit" id="oshiSubmitButton" class="flex-1 py-3 rounded-xl font-bold text-white" style="background:var(--et-accent-dark);">
+            追加する
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <!-- カレンダー画面 -->
+    <main data-view="calendar" class="hidden -mx-4 px-4 pb-6 min-h-screen" style="background:#e8f4fb;">
+      <div id="calendarContent"></div>
+    </main>
+
+    <!-- ファンクラブ追加・編集画面 -->
+    <main data-view="fanclub-add" class="hidden pt-5">
+      <p id="fanClubFormTitle" class="font-bold text-base mb-4">ファンクラブを追加</p>
+      <form id="fanClubForm" class="space-y-4">
+        <input type="hidden" name="editingId" />
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">ファンクラブ名</span>
+          <input required name="clubName" type="text" placeholder="例：◯◯ファンクラブ"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">更新期限</span>
+          <input required name="renewalDate" type="date"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">登録名義（任意）</span>
+          <input name="memberName" type="text" placeholder="例：山田花子"
+                 class="et-input w-full mt-1 px-3 py-2.5 text-[15px]" />
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">年会費（任意）</span>
+          <div class="flex items-center gap-2 mt-1">
+            <input name="annualFee" type="number" min="0" placeholder="5500"
+                   class="et-input flex-1 px-3 py-2.5 text-[15px]" />
+            <span class="text-sm text-[var(--et-ink-muted)] shrink-0">円</span>
+          </div>
+        </label>
+
+        <label class="block">
+          <span class="text-xs text-[var(--et-ink-muted)]">メモ</span>
+          <textarea name="memo" placeholder="任意" rows="2"
+                    class="et-input w-full mt-1 px-3 py-2.5 text-[15px]"></textarea>
+        </label>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="fanClubCancelEditButton" class="flex-1 py-3 rounded-xl border border-[#dde1e8] font-bold text-[var(--et-ink-muted)]">
+            戻る
+          </button>
+          <button type="submit" id="fanClubSubmitButton" class="flex-1 py-3 rounded-xl font-bold text-white" style="background:var(--et-accent-dark);">
+            追加する
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <!-- 外観設定画面（Phase 8c） -->
+    <main data-view="appearance" class="hidden">
+      <div id="appearanceContent"></div>
+    </main>
+
+  </div>
+
+  <!-- タブバー（ホーム / 記録 / 推し / カレンダー） -->
+  <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[var(--et-base)] border-t border-[#e4e8ef] flex"
+       style="padding-bottom: var(--et-safe-bottom);">
+    <!-- ホーム -->
+    <button data-view-tab="home" class="flex-1 py-3 flex flex-col items-center gap-1 text-[var(--et-accent)]">
+      <span class="tabPill neu-pressed w-11 h-7 rounded-full flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+          <path d="M9 21V12h6v9"/>
+        </svg>
+      </span>
+      <span class="text-[11px] font-semibold">ホーム</span>
+    </button>
+    <!-- 記録 -->
+    <button data-view-tab="records" class="flex-1 py-3 flex flex-col items-center gap-1 text-[var(--et-ink-muted)]">
+      <span class="tabPill w-11 h-7 rounded-full flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="4" rx="1" /><rect x="3" y="11" width="18" height="4" rx="1" /><rect x="3" y="18" width="18" height="4" rx="1" />
+        </svg>
+      </span>
+      <span class="text-[11px] font-semibold">ライブ記録</span>
+    </button>
+    <!-- 推し -->
+    <button data-view-tab="oshi" class="flex-1 py-3 flex flex-col items-center gap-1 text-[var(--et-ink-muted)]">
+      <span class="tabPill w-11 h-7 rounded-full flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+        </svg>
+      </span>
+      <span class="text-[11px] font-semibold">推し</span>
+    </button>
+    <!-- カレンダー -->
+    <button data-view-tab="calendar" class="flex-1 py-3 flex flex-col items-center gap-1 text-[var(--et-ink-muted)]">
+      <span class="tabPill w-11 h-7 rounded-full flex items-center justify-center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+      </span>
+      <span class="text-[11px] font-semibold">カレンダー</span>
+    </button>
+  </nav>
+
+  <!-- FAB 選択メニュー（推しタブ：推し or ファンクラブを選択） -->
+  <div id="fabOshiMenu" class="hidden fixed inset-0 z-40">
+    <div id="fabOshiMenuBackdrop" class="absolute inset-0 bg-black/30"></div>
+    <div class="absolute bottom-0 left-0 right-0 max-w-md mx-auto bg-[var(--et-base)] rounded-t-3xl px-5 pt-5 pb-10 shadow-xl">
+      <div class="w-8 h-1 bg-[#dde1e8] rounded-full mx-auto mb-5"></div>
+      <p class="text-center text-xs text-[var(--et-ink-muted)] mb-4">追加する項目を選んでください</p>
+      <div class="space-y-2.5">
+        <button id="fabMenuAddOshi"
+          class="w-full py-3 rounded-2xl font-bold text-sm neu-raised"
+          style="color:var(--et-accent-dark);">
+          推しを追加
+        </button>
+        <button id="fabMenuAddFanClub"
+          class="w-full py-3 rounded-2xl font-bold text-sm neu-raised"
+          style="color:var(--et-accent-dark);">
+          ファンクラブを追加
+        </button>
+        <button id="fabOshiMenuCancel"
+          class="w-full py-2.5 text-xs font-semibold text-[var(--et-ink-muted)]">
+          キャンセル
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- フローティングアクションボタン（+）：記録タブ・推しタブで表示 -->
+  <button id="fabAddButton"
+    class="hidden fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center neu-raised"
+    style="color:var(--et-accent-dark); padding-bottom: var(--et-safe-bottom);">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  </button>
+
+  <script type="module" src="js/presentation/main.js"></script>
+</body>
+</html>

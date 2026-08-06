@@ -1,0 +1,46 @@
+# このファイルは encoretrail-dev の deploy.yml によって
+# encoretrail-public/gh-pages/.github/workflows/deploy-pages.yml として自動配置される。
+# encoretrail-public で直接編集しても次のデプロイで上書きされる。
+#
+# リトライ設計の理由:
+# "Deploy from branch" から "GitHub Actions" へ切替時に残った古い
+# pages-build-deployment ジョブ（queued のまま常駐）が GitHub Pages の
+# 内部デプロイロックを断続的に握るため、push トリガー直後の deployment
+# が "Deployment failed, try again later" で失敗することがある。
+# 90秒待ってリトライすることで、ロック競合が解消した後に自動回復する。
+name: Deploy Pages
+on:
+  push:
+    branches: [gh-pages]
+  workflow_dispatch:
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # 1回目が失敗した場合、90秒待ってリトライする
+      # （GitHub Pages の内部デプロイロック競合からの自動回復）
+      - name: Wait before retry
+        if: steps.deployment.outcome == 'failure'
+        run: |
+          echo "Deployment failed. Waiting 90 seconds before retrying..."
+          sleep 90
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
